@@ -1,4 +1,5 @@
-# NMS Mini Store Frontend using React + Vite with Bootstrap 5
+# NMS Mini Store Frontend - NMS.Dev 2025
+## React + Vite with Bootstrap 5
 
 ![nms store](https://github.com/user-attachments/assets/db75d10e-f12d-4ebf-89dc-d4133b5fb1bd)
 
