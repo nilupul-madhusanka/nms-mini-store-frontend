@@ -10,11 +10,6 @@ function PrivateRoute({ children, requiredRole }) {
     return <Navigate to="/login" replace />
   }
 
-  // Redirect if user lacks required role
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/unauthorized" replace />
-  }
-
   return children
 }
 

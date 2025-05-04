@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import API from '../services/api'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import './AdminAddProduct.css'
 
 function AdminAddProduct() {
@@ -73,7 +73,7 @@ function AdminAddProduct() {
   return (
     <div className="admin-add-product-container">
       <div className="admin-add-product-card">
-        <h2>Add New Product</h2>
+        <h2>Add New Product - Admin Only</h2>
         <p className="subtitle">Fill in the details to add a new product</p>
 
         {message.text && (
@@ -135,6 +135,10 @@ function AdminAddProduct() {
             {isLoading ? 'Adding Product...' : 'Add Product'}
           </button>
         </form>
+
+        <div className="back-link">
+          <p><Link to="/login" className="auth-link">Back to Login page</Link></p>
+        </div>
 
         {createdProduct && (
           <div className="product-preview">

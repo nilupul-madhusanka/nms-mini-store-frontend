@@ -1,278 +1,185 @@
-import { useEffect, useState, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
-import API from '../services/api'
-import { AuthContext } from '../context/AuthContext'
-import './Cart.css'
+import { useEffect, useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import API from '../services/api';
+import { AuthContext } from '../context/AuthContext';
+import './Cart.css';
 
 function Cart() {
-  const [cart, setCart] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState({ text: '', type: '' })
-  const [isCheckingOut, setIsCheckingOut] = useState(false)
-  const { user } = useContext(AuthContext)
-  const navigate = useNavigate()
+  const [cart, setCart] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState({ text: '', type: '' });
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchCart = async () => {
-      try {
-        if (!user?.token) {
-          setLoading(false)
-          return
-        }
-
-        const res = await API.get('/cart', {
-          headers: {
-            Authorization: `Bearer ${user.token}`
-          }
-        })
-        setCart(res.data)
-      } catch (err) {
-        setMessage({
-          text: err.response?.data?.message || 'Failed to load cart',
-          type: 'error'
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchCart()
-  }, [user])
-
-  const updateQuantity = async (itemId, newQuantity) => {
-    if (newQuantity < 1) return
-
+  const fetchCart = async () => {
     try {
-      const res = await API.put(
-        `/cart/${itemId}`,
-        { quantity: newQuantity },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`
-          }
-        }
-      )
-      setCart(res.data)
+      const res = await API.get('/cart', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      setCart(res.data);
     } catch (err) {
       setMessage({
-        text: err.response?.data?.message || 'Failed to update quantity',
+        text: err.response?.data?.message || 'Failed to load cart',
         type: 'error'
-      })
+      });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  const removeItem = async (itemId) => {
+  useEffect(() => {
+    if (user?.token) fetchCart();
+  }, [user]);
+
+  const handleCheckout = async () => {
+    setIsCheckingOut(true);
     try {
-      const res = await API.delete(`/cart/${itemId}`, {
-        headers: {
-          Authorization: `Bearer ${user.token}`
-        }
-      })
-      setCart(res.data)
+      const res = await API.post('/checkout', {}, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      
+      setMessage({
+        text: `Order successful! Total: $${res.data.total.toFixed(2)}`,
+        type: 'success'
+      });
+      
+      await fetchCart(); // Refresh empty cart
+      
+      setTimeout(() => navigate('/products'), 10000);
+    } catch (err) {
+      setMessage({
+        text: err.response?.data?.message || 'Checkout failed',
+        type: 'error'
+      });
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleRemove = async (productId) => {
+    try {
+      await API.delete(`/cart/${productId}`, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      await fetchCart();
       setMessage({
         text: 'Item removed from cart',
         type: 'success'
-      })
+      });
     } catch (err) {
       setMessage({
         text: err.response?.data?.message || 'Failed to remove item',
         type: 'error'
-      })
+      });
     }
-  }
-
-  const handleCheckout = async () => {
-    if (!user || !user.token) {
-      setMessage({
-        text: 'You must be logged in to checkout',
-        type: 'error'
-      })
-      navigate('/login')
-      return
-    }
-
-    if (!cart?.items || cart.items.length === 0) {
-      setMessage({
-        text: 'Your cart is empty',
-        type: 'error'
-      })
-      return
-    }
-
-    setIsCheckingOut(true)
-    try {
-      await API.post(
-        '/orders',
-        {
-          items: cart.items.map(item => ({
-            productId: item.product._id,
-            quantity: item.quantity
-          }))
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`
-          }
-        }
-      )
-
-      // Clear the cart after successful order
-      await API.delete('/cart', {
-        headers: {
-          Authorization: `Bearer ${user.token}`
-        }
-      })
-
-      setMessage({
-        text: 'Order placed successfully!',
-        type: 'success'
-      })
-      
-      // Redirect to success page after 2 seconds
-      setTimeout(() => {
-        navigate('/order-success')
-      }, 2000)
-    } catch (err) {
-      setMessage({
-        text: err.response?.data?.message || 'Failed to place order',
-        type: 'error'
-      })
-    } finally {
-      setIsCheckingOut(false)
-    }
-  }
-
-  const calculateTotal = () => {
-    if (!cart?.items) return 0
-    return cart.items.reduce(
-      (total, item) => total + (item.product.price * item.quantity),
-      0
-    ).toFixed(2)
-  }
-
-  if (loading) {
-    return (
-      <div className="cart-loading">
-        <div className="spinner"></div>
-        <p>Loading your cart...</p>
-      </div>
-    )
-  }
+  };
 
   if (!user) {
     return (
-      <div className="cart-empty">
+      <div className="auth-prompt">
         <h2>Your Cart</h2>
         <p>Please login to view your cart</p>
         <button 
-          onClick={() => navigate('/login')}
           className="login-button"
+          onClick={() => navigate('/login')}
         >
           Login
         </button>
       </div>
-    )
+    );
   }
 
-  if (!cart?.items || cart.items.length === 0) {
-    return (
-      <div className="cart-empty">
-        <h2>Your Cart</h2>
-        <p>Your cart is currently empty</p>
-        <button 
-          onClick={() => navigate('/products')}
-          className="shop-button"
-        >
-          Continue Shopping
-        </button>
-      </div>
-    )
-  }
+  if (loading) return <div className="loading-spinner"></div>;
 
   return (
     <div className="cart-container">
-      <div className="cart-header">
+      <header className="cart-header">
         <h1>Your Shopping Cart</h1>
-        <p>Review your items before checkout</p>
-      </div>
+        <button 
+          className="continue-shopping-button"
+          onClick={() => navigate('/products')}
+        >
+          ← Continue Shopping
+        </button>
+      </header>
 
       {message.text && (
-        <div className={`cart-message ${message.type}`}>
+        <div className={`message ${message.type}`}>
           {message.type === 'success' ? '✓' : '⚠'} {message.text}
         </div>
       )}
 
-      <div className="cart-items">
-        {cart.items.map((item) => (
-          <div key={item._id} className="cart-item">
-            <div className="item-image">
-              <img
-                src={item.product.image}
-                alt={item.product.name}
-                onError={(e) => {
-                  e.target.src = 'https://via.placeholder.com/150?text=Product+Image'
-                }}
-              />
-            </div>
-            <div className="item-details">
-              <h3>{item.product.name}</h3>
-              <p className="item-price">${item.product.price.toFixed(2)}</p>
-              
-              <div className="quantity-control">
+      {cart?.items?.length > 0 ? (
+        <>
+          <div className="cart-items">
+            {cart.items.map(item => (
+              <div className="cart-item" key={item.product._id}>
+                <div className="item-image">
+                  <img 
+                    src={item.product.image} 
+                    alt={item.product.name}
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/150?text=Product+Image';
+                    }}
+                  />
+                </div>
+                <div className="item-details">
+                  <h3>{item.product.name}</h3>
+                  <p className="price">${item.product.price.toFixed(2)}</p>
+                  <div className="quantity-control">
+                    <span>Qty: {item.quantity}</span>
+                  </div>
+                </div>
                 <button
-                  onClick={() => updateQuantity(item._id, item.quantity - 1)}
-                  disabled={item.quantity <= 1}
+                  className="remove-button"
+                  onClick={() => handleRemove(item.product._id)}
                 >
-                  −
-                </button>
-                <span>{item.quantity}</span>
-                <button
-                  onClick={() => updateQuantity(item._id, item.quantity + 1)}
-                >
-                  +
+                  Remove
                 </button>
               </div>
-            </div>
-            <div className="item-subtotal">
-              <p>${(item.product.price * item.quantity).toFixed(2)}</p>
+            ))}
+          </div>
+
+          <div className="cart-summary">
+            <div className="summary-card">
+              <h3>Order Summary</h3>
+              <div className="summary-row">
+                <span>Subtotal</span>
+                <span>${cart.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0).toFixed(2)}</span>
+              </div>
+              <div className="summary-row">
+                <span>Shipping</span>
+                <span>Free</span>
+              </div>
+              <div className="summary-row total">
+                <span>Total</span>
+                <span>${cart.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0).toFixed(2)}</span>
+              </div>
               <button
-                onClick={() => removeItem(item._id)}
-                className="remove-item"
+                className="checkout-button"
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
               >
-                Remove
+                {isCheckingOut ? 'Processing...' : 'Proceed to Checkout'}
               </button>
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="cart-summary">
-        <div className="summary-details">
-          <h3>Order Summary</h3>
-          <div className="summary-row">
-            <span>Subtotal</span>
-            <span>${calculateTotal()}</span>
-          </div>
-          <div className="summary-row">
-            <span>Shipping</span>
-            <span>Free</span>
-          </div>
-          <div className="summary-row total">
-            <span>Total</span>
-            <span>${calculateTotal()}</span>
-          </div>
+        </>
+      ) : (
+        <div className="empty-cart">
+          <h2>Your cart is empty</h2>
+          <p>Browse our products to add items to your cart</p>
+          <button 
+            className="shop-button"
+            onClick={() => navigate('/products')}
+          >
+            Shop Now
+          </button>
         </div>
-
-        <button
-          onClick={handleCheckout}
-          disabled={isCheckingOut}
-          className="checkout-button"
-        >
-          {isCheckingOut ? 'Processing...' : 'Proceed to Checkout'}
-        </button>
-      </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default Cart
+export default Cart;
